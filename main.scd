@@ -69,7 +69,10 @@
         },
 
         kill: { |self|
+            "reached".warn;
             if (self.currentlyPlaying.notNil) {
+                self.synths[self.currentIndex].postln;
+                "killing".warn;
                 self.synths[self.currentIndex].set(\gate, 0);
             };
         },
@@ -166,14 +169,15 @@
 });
 )
 
-(
-// Use it like this:
-~players[\high].name
-~players[\high].currentlyPlaying; // nil
-~players[\high].currentIndex
-~players[\high].samples
-~players[\high].buffers
-~players[\high].start // plays first sample in ~samples[\low]
-~players[\high].currentlyPlaying; // "sample1.wav" (for example)
-~players[\high].kill // stops playing current sample
-)
+// (
+// // Use it like this:
+// ~players[\high].name
+// ~players[\high].currentlyPlaying; // nil
+// ~players[\high].currentIndex
+// ~players[\high].samples
+//
+// ~players[\mid].buffers
+// ~players[\mid].start // plays first sample in ~samples[\low]
+// ~players[\mid].currentlyPlaying; // "sample1.wav" (for example)
+// ~players[\mid].kill // stops playing current sample
+// )
