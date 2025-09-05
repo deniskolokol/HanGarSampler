@@ -72,46 +72,6 @@
             };
         },
 
-        // start: { |self|
-        //     // The logic is very straightforward: every time `start` is called,
-        //     // it advances to the next sample, i.e.:
-        //     // - always play the next sample in the list
-        //     // - if no samples were played yet, start from the first one
-        //     // - if a sample is already playing, first stop it and then play the
-        //     // next one
-        //     // - wrap around to the first sample after the last one
-        //     //
-        //     // WARNING: we do not load all samples at .init, only the first one.
-        //     // Therefore at the same time a sample is played, it is necessary to
-        //     // load the next one.
-
-        //     var samplePath;
-
-        //     if (self.samples.isNil.not and: { self.samples.size > 0 }) {
-        //         if (self.currentIndex.isNil) {
-        //             // Start from the first sample
-        //             self.currentIndex = 0;
-        //         } {
-        //             // Wrap around
-        //             self.currentIndex = self.getNextIndex;
-        //         };
-
-        //         // Within one player, only one sample can be played at a time
-        //         if (self.currentlyPlaying.notNil) { self.kill };
-
-        //         samplePath = self.samples[self.currentIndex];
-        //         self.currentlyPlaying = samplePath;
-        //         self.synths[self.currentIndex] = Synth(\bufplay, [
-        //             \buf, self.buffers[self.currentIndex]
-        //         ]);
-
-        //         // Load the next sample in the background
-        //         self.load(self.getNextIndex);
-        //     } {
-        //         "No samples available to play.".postln;
-        //     };
-        // },
-
         kill: { |self|
             if (self.currentlyPlaying.notNil) {
                 self.synths[self.currentIndex].set(\gate, 0, \lag, 0.5);
