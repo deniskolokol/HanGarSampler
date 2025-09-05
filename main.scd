@@ -1,10 +1,13 @@
 (
 // Prototype of a sampler player class.
+// Lazy-loading: upon creation of the instance only the first buffer is loaded,
+// others are being loaded when the previous are being played.
 ~samplePlayer = {
     arg name, // <String> name of the player instance
         samples; // <Array> of <String> sample filenames with full path
 
-    var player = ( // <Event> as an object prototype
+    // <Event> as an object prototype
+    var player = (
         name: name,  // <String> player's name
         samples: samples,  // <Array> of sample filenames
         buffers: nil, // <Array> of loaded buffers
@@ -19,13 +22,13 @@
 
             // Initialization means loading the first sample in `samples`
             self.currentIndex = 0; // start from the first sample
-            self.load.();
+            self.load;
 
             // Return self for chaining
             self
         },
 
-        start: { |self|
+        start: { |self ... args|
             // The logic is very straightforward: every time `start` is called,
             // it advances to the next sample, i.e.:
             // - always play the next sample in the list
@@ -37,9 +40,10 @@
             // WARNING: we do not load all samples at .init, only the first one.
             // Therefore at the same time a sample is played, it is necessary to
             // load the next one.
+            //
+            // Args: variable arguments passed to Synth as parameter pairs
 
-            var samplePath;
-            var getNextIndex = { (self.currentIndex + 1) % self.samples.size };
+            var samplePath, synthArgs;
 
             if (self.samples.isNil.not and: { self.samples.size > 0 }) {
                 if (self.currentIndex.isNil) {
@@ -47,36 +51,78 @@
                     self.currentIndex = 0;
                 } {
                     // Wrap around
-                    self.currentIndex = getNextIndex.();
+                    self.currentIndex = self.getNextIndex;
                 };
 
                 // Within one player, only one sample can be played at a time
-                if (self.currentlyPlaying.notNil) {
-                    self.stop; // stop current sample if playing
-                };
+                if (self.currentlyPlaying.notNil) { self.kill };
 
                 samplePath = self.samples[self.currentIndex];
                 self.currentlyPlaying = samplePath;
-                self.synths[self.currentIndex] = Synth(\bufplay, [
-                    \buf, self.buffers[self.currentIndex]
-                ]);
+                
+                // Build synth arguments: always include buffer, then add user args
+                synthArgs = [\buf, self.buffers[self.currentIndex]] ++ args;
+                
+                self.synths[self.currentIndex] = Synth(\bufplay, synthArgs);
 
                 // Load the next sample in the background
-                self.load(getNextIndex.());
+                self.load(self.getNextIndex);
             } {
                 "No samples available to play.".postln;
             };
         },
 
+        // start: { |self|
+        //     // The logic is very straightforward: every time `start` is called,
+        //     // it advances to the next sample, i.e.:
+        //     // - always play the next sample in the list
+        //     // - if no samples were played yet, start from the first one
+        //     // - if a sample is already playing, first stop it and then play the
+        //     // next one
+        //     // - wrap around to the first sample after the last one
+        //     //
+        //     // WARNING: we do not load all samples at .init, only the first one.
+        //     // Therefore at the same time a sample is played, it is necessary to
+        //     // load the next one.
+
+        //     var samplePath;
+
+        //     if (self.samples.isNil.not and: { self.samples.size > 0 }) {
+        //         if (self.currentIndex.isNil) {
+        //             // Start from the first sample
+        //             self.currentIndex = 0;
+        //         } {
+        //             // Wrap around
+        //             self.currentIndex = self.getNextIndex;
+        //         };
+
+        //         // Within one player, only one sample can be played at a time
+        //         if (self.currentlyPlaying.notNil) { self.kill };
+
+        //         samplePath = self.samples[self.currentIndex];
+        //         self.currentlyPlaying = samplePath;
+        //         self.synths[self.currentIndex] = Synth(\bufplay, [
+        //             \buf, self.buffers[self.currentIndex]
+        //         ]);
+
+        //         // Load the next sample in the background
+        //         self.load(self.getNextIndex);
+        //     } {
+        //         "No samples available to play.".postln;
+        //     };
+        // },
+
         kill: { |self|
-            "reached".warn;
             if (self.currentlyPlaying.notNil) {
-                self.synths[self.currentIndex].postln;
-                "killing".warn;
-                self.synths[self.currentIndex].set(\gate, 0);
+                self.synths[self.currentIndex].set(\gate, 0, \lag, 0.5);
+                self.currentlyPlaying = nil;
             };
         },
-            
+
+        getNextIndex: { |self|
+            (self.currentIndex + 1) % self.samples.size
+        },
+
         isBufferLoaded: { |self, index|
             if (self.buffers.notNil) {
                 var buf = self.buffers[index];
@@ -110,7 +156,6 @@
                             0.1.wait; // wait until buffer is loaded
                         };
                         loadingRoutine.stop;
-                        // self.buffers[index] = buf;
                     }).play;
                 };
             } {
@@ -122,7 +167,9 @@
     // return player
     player.init.();
 };
+)
 
+(
 // Initialize empty Event for samples (maintains order of keys)
 ~samples = Event.new;
 
