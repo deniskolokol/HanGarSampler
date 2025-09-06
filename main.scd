@@ -127,27 +127,23 @@
     // return player
     player.init.();
 };
-)
 
-(
-// Initialize empty Event for samples (maintains order of keys)
-~samples = Event.new;
 
-// Function to walk through samples directory and build the Event
-~buildSamplesDict = {
-    var samplesPath = thisProcess.nowExecutingPath.dirname +/+ "samples";
-    var orderedFolders;
-    
+// Walk through samples directory and build the Event
+~getSamples = {
+    arg path; // <String>
+    var result = Event.new;
+
     // Get folders and sort them to ensure consistent order
-    orderedFolders = PathName(samplesPath).folders.sort({ |a, b| 
+    var dirNames = PathName(path).folders.sort({ |a, b| 
         a.folderName < b.folderName 
     });
 
-    orderedFolders.do({ |folder|
+    dirNames.do({ |dirName|
         var audioFiles;
         
-        // Get all .wav, .aif, and .aiff files in this folder
-        audioFiles = folder.entries.select({ |file|
+        // Get all .wav, .aif, and .aiff files in this dirName
+        audioFiles = dirName.entries.select({ |file|
             var extension = file.extension.toLower;
             (extension == "wav") || (extension == "aif") || (extension == "aiff")
         }).collect({ |file|
@@ -156,24 +152,50 @@
 
         // Add to Event if we found any audio files
         if(audioFiles.size > 0) {
-            ~samples.put(folder.folderName.asSymbol, audioFiles);
+            result.put(dirName.folderName.asSymbol, audioFiles);
         };
     });
+
+    // returns Event (ordered dictionary)
+    result
 };
 
-// Build the dictionary
-~buildSamplesDict.value;
 
-// Print the results for verification
-"Dictionary contents:".postln;
+// Load external file
+~loadExternal = { 
+    arg path,
+        descr,
+        requiresSync=true;
+
+    postf("> Loading %... ", descr);
+    if (this.executeFile(path).isNil.not) {
+        "OK".postln;
+        if (requiresSync) {
+            "[i] Server sync... ".post;
+            s.sync; // wait until all asynchronous tasks are finished
+            "OK".postln;
+        };
+    } {
+        postf("ERROR: Could not load %!\n", path);
+    };
+};
+
+
+// Initialize empty Event for samples (maintains order of keys)
+~samples = Event.new;
+
+// Root directory is empty string before the first choice accepted
+~rootDir = "";
+
+// Initialize Dictionary for sample players
 ~players = Dictionary.new;
-~samples.keysValuesDo({ |key, value|
-    // "\n%:".format(key).postln;
-    // value.do({ |file|
-    //     "\t%".format(file).postln;
-    // });
-    ~players[key] = ~samplePlayer.(name: key.asString, samples: value);
-});
+
+// Show the GUI
+~loadExternal.(
+    PathName(thisProcess.nowExecutingPath).parentPath +/+ "gui.scd",
+    "GUI",
+    false
+);
 )
 
 // (
