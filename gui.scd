@@ -1,12 +1,60 @@
-(
 // GUI Module - gui.scd
-// Full-screen canvas with directory browser for audio files
-var win;
 
+(
 // Warning: this should be changed - once the functionality is completed,
 //          the window will be used in the fullScreen.
-var height = 500;
-var width = 500;
+var noDirSelected = "No directory selected - Press Ctrl+O to open";
+var height = 800;
+var width = 800;
+var win = RedWindow("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height))
+    .background_(Color.black);
+
+var toggleFullscreen = { |window|
+    if (window.bounds == Window.screenBounds) {
+        window.endFullScreen
+    } {
+        window.fullScreen
+    }
+};
+
+// Open directory dialog
+var openDirectory = {
+    FileDialog({ |path|
+        var tempEvent;
+
+        if (File.exists(path) and: { File.type(path) == \directory }) {
+            tempEvent = ~getSamples.(path);
+            if (tempEvent.isEmpty) {
+                // No audio files found - show error
+                ("Error: No audio files (*.wav, *.aif, *.aiff) found in directory: " ++ path).error;
+            } {
+                // Success - update current directory and audio files
+                ~rootDir = path;
+                ~samples = tempEvent;
+
+                // Log success
+                postf("Successfully loaded audio files from: %\n", ~rootDir);
+                ~samples.keysValuesDo({ |key, value|
+                    "\n%:".format(key).postln;
+                    value.do({ |file|
+                        "\t%".format(file).postln;
+                    });
+                    ~players[key] = ~samplePlayer.(name: key.asString, samples: value);
+                });
+            };
+        } {
+            ("Error: Selected path is not a valid directory: " ++ path).postln;
+        };
+    },
+    fileMode: 2, // Directory mode
+    acceptMode: 0, // Open mode
+    stripResult: true,
+
+    // Warning: fix this!
+    //path: PathName(thisProcess.nowExecutingPath).pathOnly
+    );
+};
+
 
 ~gui = { |window|
     var signalSuccess = false;
@@ -14,69 +62,32 @@ var width = 500;
     var directoryLabel;
     var audioFiles = nil;
 
-    // Function to open directory dialog
-    var openDirectory = {
-        FileDialog({ |path|
-            var tempEvent;
-
-            if (File.exists(path) and: { File.type(path) == \directory }) {
-                tempEvent = ~getSamples.(path);
-                if (tempEvent.isEmpty) {
-                    // No audio files found - show error
-                    ("Error: No audio files (*.wav, *.aif, *.aiff) found in directory: " ++ path).error;
-                } {
-                    // Success - update current directory and audio files
-                    ~rootDir = path;
-                    ~samples = tempEvent;
-
-                    // Update directory label
-                    directoryLabel.string_(~rootDir);
-
-                    // Log success
-                    postf("Successfully loaded audio files from: %\n", ~rootDir);
-                    ~samples.keysValuesDo({ |key, value|
-                        "\n%:".format(key).postln;
-                        value.do({ |file|
-                            "\t%".format(file).postln;
-                        });
-                        ~players[key] = ~samplePlayer.(name: key.asString, samples: value);
-                    });
-                };
-            } {
-                ("Error: Selected path is not a valid directory: " ++ path).postln;
-            };
-        },
-        fileMode: 2, // Directory mode
-        acceptMode: 0, // Open mode
-        stripResult: true,
-
-        // Warning: fix this!
-        //path: PathName(thisProcess.nowExecutingPath).pathOnly
-        );
-    };
-
     // Create directory label in upper left corner
     directoryLabel = StaticText(window, Rect(10, 10, 800, 30))
-        .string_("No directory selected - Press Ctrl+O to open")
+        .string_(noDirSelected)
         .stringColor_(Color.white)
         .background_(Color.clear)
         .font_(Font("Arial", 14));
 
     // Set up canvas draw function
     win.draw {
+        var gridSize = 200; // Grid spacing
         var bounds = win.bounds;
+
+        // Update directory label
+        directoryLabel.string_(if (~rootDir.isEmpty.not) { ~rootDir } { noDirSelected });
 
         // Draw basic grid or other canvas elements here if needed
         Pen.strokeColor_(Color.gray(0.1));
         Pen.width_(1);
 
         // Draw a subtle grid
-        (0, 50 .. bounds.width.asInteger).do({ |x|
+        (0, gridSize .. bounds.width.asInteger).do({ |x|
             Pen.moveTo(Point(x, 0));
             Pen.lineTo(Point(x, bounds.height));
         });
 
-        (0, 50 .. bounds.height.asInteger).do({ |y|
+        (0, gridSize .. bounds.height.asInteger).do({ |y|
             Pen.moveTo(Point(0, y));
             Pen.lineTo(Point(bounds.width, y));
         });
@@ -86,7 +97,7 @@ var width = 500;
         // Draw circles for each key in ~samples
         if (~samples.notNil and: { ~samples.size > 0 }) {
             var numKeys = ~samples.keys.size;
-            var gridSize = 50; // Grid spacing
+            var gridSize = 200; // Grid spacing
             var circleRadius = 20;
             var maxCirclesPerRow = ((bounds.width / gridSize).floor - 2).max(1); // Leave margin
             var numRows = (numKeys / maxCirclesPerRow).ceil;
@@ -157,10 +168,15 @@ var width = 500;
 
     // Set up key handlers
     window.view.keyDownAction_({ |view, char, modifiers, unicode, keycode|
-        // Check for Cmd+O
-        if ((modifiers.bitAnd(1048576) != 0) && (char == $o)) {
-            openDirectory.();
-        };
+        case
+        // Cmd+O: open directory
+        { (modifiers.bitAnd(1048576) != 0) && (char == $o) } { openDirectory.() }
+        // Ctrl+F: toggle fullscreen
+        { (modifiers.bitAnd(1048576) != 0) && (char == $f) } { toggleFullscreen.(win) }
+        // ESC: exit fullscreen
+        { (modifiers == 0) && (keycode == 53) } {  win.endFullScreen }
+        // ...all the rest
+        { [view, char, modifiers, unicode, keycode].postln }
     });
 
     // Make sure window can receive key events
@@ -182,7 +198,7 @@ var width = 500;
 };
 
 // Create the main window
-win = RedWindow("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false)
+win = RedWindow("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false, border: false)
     .background_(Color.black);
 ~guiInstance = ~gui.(win);
 
