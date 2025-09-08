@@ -1,13 +1,23 @@
 // GUI Module - gui.scd
 
 (
+// Physics
+var physics = TraerParticleSystem.new;
+var staticParticles = List.new();
+var speed = 1; // physics simulation speed
+
+// GUI
+//
 // Warning: this should be changed - once the functionality is completed,
 //          the window will be used in the fullScreen.
 var noDirSelected = "No directory selected - Press Ctrl+O to open";
-var height = 800;
-var width = 800;
-var win = RedWindow("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height))
-    .background_(Color.black);
+var transparent = Color.grey(alpha:0.0);
+var gridSize = 200; // Grid spacing
+var intersections; // Grid centers (coords of the points of attraction)
+var height = Window.screenBounds.height;
+var width = Window.screenBounds.width;
+var win;
+var gui; // Event containing GUI elements
 
 var toggleFullscreen = { |window|
     if (window.bounds == Window.screenBounds) {
@@ -56,26 +66,64 @@ var openDirectory = {
 };
 
 
-~gui = { |window|
+// Function to get grid intersection points
+var getGridIntersections = { |width, height, gridSize|
+    var intersections = List.new;
+    var numX = (width / gridSize).floor + 1;
+    var numY = (height / gridSize).floor + 1;
+    var margin = gridSize / 3;
+    
+    numY.do({ |row|
+        numX.do({ |col|
+            var x = col * gridSize;
+            var y = row * gridSize;
+            
+            // Only add if not too close to borders
+            if ((x >= margin) and: { x <= (width - margin) } and: 
+                { y >= margin } and: { y <= (height - margin) }) {
+                intersections.add([x, y]);
+            };
+        });
+    });
+    
+    intersections;
+};
+
+// Setup initial conditions for physics
+var physicsInit = { |partCoords|
+    partCoords.do { |coords|
+        var x, y, particle;
+
+        # x, y = coords;
+        particle = physics.makeParticle(1, x, y, 0);
+        staticParticles.add(particle);
+        particle.makeFixed;
+    };
+};
+
+var makeGUI = { |window|
     var signalSuccess = false;
     var signalFailure = false;
-    var directoryLabel;
     var audioFiles = nil;
 
+    var canvas = UserView(window, window.bounds)
+        .background_(Color.black);
+
     // Create directory label in upper left corner
-    directoryLabel = StaticText(window, Rect(10, 10, 800, 30))
+    var directoryLabel = StaticText(canvas, Rect(10, 10, 800, 30))
         .string_(noDirSelected)
         .stringColor_(Color.white)
         .background_(Color.clear)
         .font_(Font("Arial", 14));
 
     // Set up canvas draw function
-    win.draw {
-        var gridSize = 200; // Grid spacing
+    canvas.drawFunc = { |view|
         var bounds = win.bounds;
 
         // Update directory label
-        directoryLabel.string_(if (~rootDir.isEmpty.not) { ~rootDir } { noDirSelected });
+        directoryLabel.string_(
+            if (~rootDir.notNil and: { ~rootDir.trim != "" }) { ~rootDir } { noDirSelected }
+            );
 
         // Draw basic grid or other canvas elements here if needed
         Pen.strokeColor_(Color.gray(0.1));
@@ -93,6 +141,11 @@ var openDirectory = {
         });
 
         Pen.stroke;
+
+        Pen.color = Color.blue(0.2, 0.6);
+        staticParticles.do { |particle|
+            Pen.fillOval(Rect.aboutPoint(Point(particle.position.x, particle.position.y), 12, 12));
+        };
 
         // Draw circles for each key in ~samples
         if (~samples.notNil and: { ~samples.size > 0 }) {
@@ -139,7 +192,7 @@ var openDirectory = {
                     circleRadius * 2
                 ));
                 Pen.fillStroke;
-                
+
                 // Draw key label in center of circle
                 Pen.stringCenteredIn(
                     key.asString,
@@ -163,8 +216,11 @@ var openDirectory = {
         //         Point(bounds.width * 0.5 - 100, bounds.height * 0.5),
         //         Font("Arial", 24), Color.white);
         // };
+        physics.tick(speed);
     };
-    win.play;
+
+    // Animate!
+    canvas.animate = true;
 
     // Set up key handlers
     window.view.keyDownAction_({ |view, char, modifiers, unicode, keycode|
@@ -191,19 +247,34 @@ var openDirectory = {
     // Return an interface object
     (
         window: window,
+        canvas: canvas,
         currentDirectory: { ~rootDir },
         samples: { ~samples },
         openDirectory: openDirectory
     );
 };
 
-// Create the main window
-win = RedWindow("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false, border: false)
-    .background_(Color.black);
-~guiInstance = ~gui.(win);
+// Get the intersections to create static particles - centers of attraction
+intersections = getGridIntersections.(width, height, gridSize);
 
-// Show the window
-win.front;
+// Setup physics initial conditions
+physicsInit.(intersections);
+
+// Create the main window
+win = Window("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false)
+    .background_(Color.black)
+    .front;
+gui = makeGUI.(win);
+
+{ // Global app clock
+    var tick;
+    while {win.isClosed.not} {
+        tick = Main.elapsedTime + (1/60);
+        gui.canvas.refresh;
+
+        (tick - Main.elapsedTime).max(0.001).wait;
+    }
+}.fork(AppClock);
 
 CmdPeriod.doOnce({
     "Caught signal: <shut down>".warn;
