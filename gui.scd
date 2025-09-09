@@ -1,11 +1,6 @@
 // GUI Module - gui.scd
 
 (
-// Physics
-var physics = TraerParticleSystem.new;
-var staticParticles = List.new();
-var speed = 1; // physics simulation speed
-
 // GUI
 //
 // Warning: this should be changed - once the functionality is completed,
@@ -89,17 +84,6 @@ var getGridIntersections = { |width, height, gridSize|
     intersections;
 };
 
-// Setup initial conditions for physics
-var physicsInit = { |partCoords|
-    partCoords.do { |coords|
-        var x, y, particle;
-
-        # x, y = coords;
-        particle = physics.makeParticle(1, x, y, 0);
-        staticParticles.add(particle);
-        particle.makeFixed;
-    };
-};
 
 var makeGUI = { |window|
     var signalSuccess = false;
@@ -142,11 +126,6 @@ var makeGUI = { |window|
 
         Pen.stroke;
 
-        Pen.color = Color.blue(0.2, 0.6);
-        staticParticles.do { |particle|
-            Pen.fillOval(Rect.aboutPoint(Point(particle.position.x, particle.position.y), 12, 12));
-        };
-
         // Draw circles for each key in ~samples
         if (~samples.notNil and: { ~samples.size > 0 }) {
             var numKeys = ~samples.keys.size;
@@ -179,7 +158,7 @@ var makeGUI = { |window|
                 // Snap to grid intersection
                 gridX = (x / gridSize).round * gridSize;
                 gridY = (y / gridSize).round * gridSize;
-                
+
                 // Draw circle
                 Pen.strokeColor_(Color.white);
                 Pen.fillColor_(Color.blue(0.3, 0.7));
@@ -216,11 +195,29 @@ var makeGUI = { |window|
         //         Point(bounds.width * 0.5 - 100, bounds.height * 0.5),
         //         Font("Arial", 24), Color.white);
         // };
-        physics.tick(speed);
     };
+
+    // React to mouse
+    canvas.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
+        case
+        { [0, 256].includes(modifiers) } { // no modifiers
+            // control sample players
+            //
+            // playerParticles.values.do { |particle|
+            //     if (
+            //         ((x - particle.position.x).abs <= 20) &&
+            //         ((y - particle.position.y).abs <= 20)
+            //     ) {
+            //         particle.position.set(x, y, particle.position.z)
+            //     };
+            // }
+        };
+    };
+    canvas.mouseMoveAction = canvas.mouseDownAction;
 
     // Animate!
     canvas.animate = true;
+
 
     // Set up key handlers
     window.view.keyDownAction_({ |view, char, modifiers, unicode, keycode|
@@ -256,9 +253,6 @@ var makeGUI = { |window|
 
 // Get the intersections to create static particles - centers of attraction
 intersections = getGridIntersections.(width, height, gridSize);
-
-// Setup physics initial conditions
-physicsInit.(intersections);
 
 // Create the main window
 win = Window("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false)
