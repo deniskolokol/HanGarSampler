@@ -1,4 +1,9 @@
+s.quit;
+
 (
+// Server config.
+Server.default = s = Server.local;
+
 ~position = {
     arg x = 0, y = 0, radius = 10;
     
@@ -244,12 +249,21 @@
 // Initialize Dictionary for sample players
 ~players = Dictionary.new;
 
-// Show the GUI
-~loadExternal.(
-    PathName(thisProcess.nowExecutingPath).parentPath +/+ "gui.scd",
-    "GUI",
-    false
-);
+s.waitForBoot({
+    var path = PathName(thisProcess.nowExecutingPath).parentPath;
+
+    // List of external files to load in the order they should be loaded.
+    // Format: [filename <str>, description <str>, requiresSync <bool>]
+    var externals = [
+        ["synthdef.scd", "synth definitions", true],
+        ["gui.scd", "GUI", false]
+    ];
+
+    externals.do({ |elt|
+        elt[0] = path +/+ elt[0];
+        ~loadExternal.(*elt);
+    });
+})
 )
 
 // (
