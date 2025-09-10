@@ -1,4 +1,48 @@
 (
+~position = {
+    arg x = 0, y = 0, radius = 10;
+    
+    // <Event> as an object prototype for position
+    var position = (
+        x: x,
+        y: y, 
+        radius: radius,
+
+        init: { |self|
+            // Initialize
+            self.set(x, y, radius);
+            // Return self for chaining
+            self
+        },
+
+        // Method to set all coordinates at once
+        set: { |self, newX, newY, newRadius|
+            self.x = newX;
+            self.y = newY;
+            if (newRadius.notNil) { self.radius = newRadius };
+        },
+        
+        // Method to get position as Point
+        asPoint: { |self|
+            Point(self.x, self.y);
+        },
+        
+        // Method to check if a point is within this position's radius
+        contains: { |self, pointX, pointY|
+            var distance = ((pointX - self.x).squared + (pointY - self.y).squared).sqrt;
+            distance <= self.radius;
+        },
+        
+        // String representation
+        asString: { |self|
+            "Position(x: %, y: %, radius: %)".format(self.x, self.y, self.radius);
+        }
+    );
+
+    // return position
+    position
+};
+
 // Prototype of a sampler player class.
 // Lazy-loading: upon creation of the instance only the first buffer is loaded,
 // others are being loaded when the previous are being played.
@@ -14,6 +58,7 @@
         synths: nil, // <Array> of active synths
         currentIndex: nil, // <Integer> index of currently playing sample
         currentlyPlaying: nil, // <String> filename of currently playing sample
+        position: nil, // <Event> position of the player on the canvas
 
         init: { arg self;
             // Initialize buffers and synths arrays
@@ -121,11 +166,20 @@
             } {
                 "No samples available to load.".postln;
             };
-        }
+        },
+
+        // Setter for position - allows setting position object or individual coordinates
+        setPosition: { |self, x, y, radius|
+            if (self.position.isNil) {
+                self.position = ~position.(x, y, radius);
+            } {
+                self.position.set(x, y, radius);
+            }
+        },
     );
 
     // return player
-    player.init.();
+    player.init;
 };
 
 

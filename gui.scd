@@ -66,7 +66,7 @@ var getGridIntersections = { |width, height, gridSize|
     var intersections = List.new;
     var numX = (width / gridSize).floor + 1;
     var numY = (height / gridSize).floor + 1;
-    var margin = gridSize / 3;
+    var proximity = gridSize / 3;
     
     numY.do({ |row|
         numX.do({ |col|
@@ -74,14 +74,51 @@ var getGridIntersections = { |width, height, gridSize|
             var y = row * gridSize;
             
             // Only add if not too close to borders
-            if ((x >= margin) and: { x <= (width - margin) } and: 
-                { y >= margin } and: { y <= (height - margin) }) {
+            if ((x >= proximity) and: { x <= (width - proximity) } and: 
+                { y >= proximity } and: { y <= (height - proximity) }) {
                 intersections.add([x, y]);
             };
         });
     });
     
     intersections;
+};
+
+var distributeEvenly = { |numItems|
+    var maxCirclesPerRow = ((width / gridSize).floor - 2).max(1); // Leave margin
+    var numRows = (numItems / maxCirclesPerRow).ceil;
+    var actualCirclesPerRow, startX, startY;
+    var result = List.new;
+
+    numItems.do({ |index|
+        var row = (index / maxCirclesPerRow).floor;
+        var col = index % maxCirclesPerRow;
+        var x, y, gridX, gridY;
+        
+        // Calculate how many circles in this row
+        actualCirclesPerRow = if (row == (numRows - 1)) {
+            numItems - (row * maxCirclesPerRow); // Last row might have fewer
+        } {
+            maxCirclesPerRow;
+        };
+        
+        // Calculate starting position to center the row
+        startX = (width - ((actualCirclesPerRow - 1) * gridSize)) * 0.5;
+        startY = (height - ((numRows - 1) * gridSize)) * 0.5;
+        
+        // Calculate position
+        x = startX + (col * gridSize);
+        y = startY + (row * gridSize);
+        
+        // Snap to grid intersection
+        gridX = (x / gridSize).round * gridSize;
+        gridY = (y / gridSize).round * gridSize;
+
+        result.add([gridX, gridY]);
+    });
+
+    // return List of coordinates
+    result
 };
 
 
@@ -103,6 +140,7 @@ var makeGUI = { |window|
     // Set up canvas draw function
     canvas.drawFunc = { |view|
         var bounds = win.bounds;
+        var circleRadius = 20;
 
         // Update directory label
         directoryLabel.string_(
@@ -126,49 +164,32 @@ var makeGUI = { |window|
 
         Pen.stroke;
 
-        // Draw circles for each key in ~samples
-        if (~samples.notNil and: { ~samples.size > 0 }) {
-            var numKeys = ~samples.keys.size;
-            var gridSize = 200; // Grid spacing
-            var circleRadius = 20;
+        if (~players.notNil and: { ~players.size > 0 }) {
+            var numKeys = ~players.keys.size;
             var maxCirclesPerRow = ((bounds.width / gridSize).floor - 2).max(1); // Leave margin
             var numRows = (numKeys / maxCirclesPerRow).ceil;
-            var actualCirclesPerRow, startX, startY;
+            var coords;
 
-            ~samples.keys.do({ |key, index|
-                var row = (index / maxCirclesPerRow).floor;
-                var col = index % maxCirclesPerRow;
-                var x, y, gridX, gridY;
-                
-                // Calculate how many circles in this row
-                actualCirclesPerRow = if (row == (numRows - 1)) {
-                    numKeys - (row * maxCirclesPerRow); // Last row might have fewer
-                } {
-                    maxCirclesPerRow;
+            // Check if players aren't placed yet, and calculate default spacing:
+            if (~players.any { |player| player.position.isNil }) {
+                coords = distributeEvenly.(~players.keys.size);
+            };
+
+            ~players.keysValuesDo({ |key, player, i|
+                if (player.position.isNil) {
+                    player.setPosition(coords[i][0], coords[i][1], circleRadius);
                 };
-                
-                // Calculate starting position to center the row
-                startX = (bounds.width - ((actualCirclesPerRow - 1) * gridSize)) * 0.5;
-                startY = (bounds.height - ((numRows - 1) * gridSize)) * 0.5;
-                
-                // Calculate position
-                x = startX + (col * gridSize);
-                y = startY + (row * gridSize);
-                
-                // Snap to grid intersection
-                gridX = (x / gridSize).round * gridSize;
-                gridY = (y / gridSize).round * gridSize;
 
                 // Draw circle
                 Pen.strokeColor_(Color.white);
                 Pen.fillColor_(Color.blue(0.3, 0.7));
                 Pen.width_(2);
-                
+
                 Pen.addOval(Rect(
-                    gridX - circleRadius, 
-                    gridY - circleRadius, 
-                    circleRadius * 2, 
-                    circleRadius * 2
+                    player.position.x - player.position.radius, 
+                    player.position.y - player.position.radius, 
+                    player.position.radius * 2, 
+                    player.position.radius * 2
                 ));
                 Pen.fillStroke;
 
@@ -176,10 +197,10 @@ var makeGUI = { |window|
                 Pen.stringCenteredIn(
                     key.asString,
                     Rect(
-                        gridX - circleRadius,
-                        gridY - circleRadius,
-                        circleRadius * 2,
-                        circleRadius * 2
+                        player.position.x - player.position.radius,
+                        player.position.y - player.position.radius,
+                        player.position.radius * 2,
+                        player.position.radius * 2
                     ),
                     Font("Arial", 12),
                     Color.white
@@ -199,18 +220,32 @@ var makeGUI = { |window|
 
     // React to mouse
     canvas.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
+        postf(
+            "x: %, y: %, modifiers: %, buttonNumber: %, clickCount: %\n",
+            x, y, modifiers, buttonNumber, clickCount
+        );
         case
-        { [0, 256].includes(modifiers) } { // no modifiers
-            // control sample players
-            //
-            // playerParticles.values.do { |particle|
-            //     if (
-            //         ((x - particle.position.x).abs <= 20) &&
-            //         ((y - particle.position.y).abs <= 20)
-            //     ) {
-            //         particle.position.set(x, y, particle.position.z)
-            //     };
-            // }
+        // no modifiers left button double click
+        { [0, 256].includes(modifiers) && (buttonNumber == 0) && (clickCount == 2) } {
+            ~players.keysValuesDo({ |key, player|
+                if (player.position.notNil and: { player.position.contains(x, y) }) {
+                    // Double-clicked within this player's radius
+                    if (player.currentlyPlaying.notNil) {
+                        // Currently playing - kill it
+                        player.kill;
+                        ("Player '%' stopped".format(player.name)).postln;
+                    } {
+                        // Not playing - start it
+                        player.start;
+                        ("Player '%' started".format(player.name)).postln;
+                    };
+                };
+            });
+        }
+        // no modifiers left button single click
+        { [0, 256].includes(modifiers) && (buttonNumber == 0) && (clickCount == 1) } {
+            // TODO: move player around
+            nil
         };
     };
     canvas.mouseMoveAction = canvas.mouseDownAction;
@@ -246,7 +281,6 @@ var makeGUI = { |window|
         window: window,
         canvas: canvas,
         currentDirectory: { ~rootDir },
-        samples: { ~samples },
         openDirectory: openDirectory
     );
 };
