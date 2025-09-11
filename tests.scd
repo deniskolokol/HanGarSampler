@@ -1,6 +1,6 @@
 (
 // Unit Tests for Sample Player
-// Run these tests after loading your ~samplePlayer class
+// Run these tests after loading your ~cSamplePlayer class
 
 // Test setup
 ~runTests = {    
@@ -36,7 +36,7 @@
         "=== TEST GROUP 1: Initial State ===".postln;
 
         // Create player instance
-        player1 = ~samplePlayer.(name: \collection1, samples: testSamples);
+        player1 = ~cSamplePlayer.(name: \collection1, samples: testSamples);
 
         // Wait a moment for initialization
         {
@@ -128,11 +128,11 @@
                             "\n=== TEST GROUP 6: Edge Cases ===\n".postf;
 
                             // Test 6.1: Empty samples array
-                            playerEmpty = ~samplePlayer.(name: \empty, samples: []);
+                            playerEmpty = ~cSamplePlayer.(name: \empty, samples: []);
                             assert.(playerEmpty.samples.size == 0, "handles empty samples array");
 
                             // Test 6.2: Single sample
-                            playerSingle = ~samplePlayer.(name: \single, samples: [testSamples[0]]);
+                            playerSingle = ~cSamplePlayer.(name: \single, samples: [testSamples[0]]);
                             assert.(playerSingle.samples.size == 1, "handles single sample");
                             assert.(playerSingle.getNextIndex == 0, "single sample wraps to itself");
 
@@ -163,7 +163,7 @@
 
     "Running basic initial state tests...".postln;
     s.waitForBoot({
-        var player1 = ~samplePlayer.(name: \collection1, samples: testSamples);
+        var player1 = ~cSamplePlayer.(name: \collection1, samples: testSamples);
 
         {
             "Testing initial state:".postln;

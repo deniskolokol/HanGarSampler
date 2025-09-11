@@ -4,7 +4,7 @@ s.quit;
 // Server config.
 Server.default = s = Server.local;
 
-~position = {
+~cPosition = {
     arg x = 0, y = 0, radius = 10;
     
     // <Event> as an object prototype for position
@@ -26,18 +26,18 @@ Server.default = s = Server.local;
             self.y = newY;
             if (newRadius.notNil) { self.radius = newRadius };
         },
-        
+
         // Method to get position as Point
         asPoint: { |self|
             Point(self.x, self.y);
         },
-        
+
         // Method to check if a point is within this position's radius
         contains: { |self, pointX, pointY|
             var distance = ((pointX - self.x).squared + (pointY - self.y).squared).sqrt;
             distance <= self.radius;
         },
-        
+
         // String representation
         asString: { |self|
             "Position(x: %, y: %, radius: %)".format(self.x, self.y, self.radius);
@@ -51,7 +51,7 @@ Server.default = s = Server.local;
 // Prototype of a sampler player class.
 // Lazy-loading: upon creation of the instance only the first buffer is loaded,
 // others are being loaded when the previous are being played.
-~samplePlayer = {
+~cSamplePlayer = {
     arg name, // <String> name of the player instance
         samples; // <Array> of <String> sample filenames with full path
 
@@ -176,7 +176,7 @@ Server.default = s = Server.local;
         // Setter for position - allows setting position object or individual coordinates
         setPosition: { |self, x, y, radius|
             if (self.position.isNil) {
-                self.position = ~position.(x, y, radius);
+                self.position = ~cPosition.(x, y, radius);
             } {
                 self.position.set(x, y, radius);
             }
@@ -265,16 +265,3 @@ s.waitForBoot({
     });
 })
 )
-
-// (
-// // Use it like this:
-// ~players[\high].name
-// ~players[\high].currentlyPlaying; // nil
-// ~players[\high].currentIndex
-// ~players[\high].samples
-//
-// ~players[\mid].buffers
-// ~players[\mid].start // plays first sample in ~samples[\low]
-// ~players[\mid].currentlyPlaying; // "sample1.wav" (for example)
-// ~players[\mid].kill // stops playing current sample
-// )

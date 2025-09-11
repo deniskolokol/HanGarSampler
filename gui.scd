@@ -44,7 +44,7 @@ var openDirectory = {
                     value.do({ |file|
                         "\t%".format(file).postln;
                     });
-                    ~players[key] = ~samplePlayer.(name: key.asString, samples: value);
+                    ~players[key] = ~cSamplePlayer.(name: key.asString, samples: value);
                 });
             };
         } {
