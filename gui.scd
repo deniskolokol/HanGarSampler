@@ -11,7 +11,6 @@ var gridSize = 200; // Grid spacing
 var intersections; // Grid centers (coords of the points of attraction)
 var height = Window.screenBounds.height;
 var width = Window.screenBounds.width;
-var win;
 var gui; // Event containing GUI elements
 
 var toggleFullscreen = { |window|
@@ -139,7 +138,7 @@ var makeGUI = { |window|
 
     // Set up canvas draw function
     canvas.drawFunc = { |view|
-        var bounds = win.bounds;
+        var bounds = ~window.bounds;
         var circleRadius = 20;
 
         // Update directory label
@@ -220,25 +219,29 @@ var makeGUI = { |window|
 
     // React to mouse
     canvas.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
-        postf(
-            "x: %, y: %, modifiers: %, buttonNumber: %, clickCount: %\n",
-            x, y, modifiers, buttonNumber, clickCount
-        );
+        var players;
+
+        // First figure out the player(s) under the mouse
+        players = ~players.select({ |player|
+            (player.position.notNil and: { player.position.contains(x, y) })
+        });
+
+        postf("modifiers %, button %, clickCount: %\n", modifiers, buttonNumber, clickCount);
+
         case
         // no modifiers left button double click
         { [0, 256].includes(modifiers) && (buttonNumber == 0) && (clickCount == 2) } {
-            ~players.keysValuesDo({ |key, player|
-                if (player.position.notNil and: { player.position.contains(x, y) }) {
-                    // Double-clicked within this player's radius
-                    if (player.currentlyPlaying.notNil) {
-                        // Currently playing - kill it
-                        player.kill;
-                        ("Player '%' stopped".format(player.name)).postln;
-                    } {
-                        // Not playing - start it
-                        player.start;
-                        ("Player '%' started".format(player.name)).postln;
-                    };
+            players.keysValuesDo({ |key, player|
+                "Caught double-click on player '%' at (%, %)".format(key, x, y).postln;
+                // Double-clicked within this player's radius
+                if (player.synthActive.notNil) {
+                    // Currently playing - kill it
+                    player.terminate;
+                    ("Player '%' stopped".format(player.name)).postln;
+                } {
+                    // Not playing - start it
+                    player.start;
+                    ("Player '%' started".format(player.name)).postln;
                 };
             });
         }
@@ -260,9 +263,9 @@ var makeGUI = { |window|
         // Cmd+O: open directory
         { (modifiers.bitAnd(1048576) != 0) && (char == $o) } { openDirectory.() }
         // Ctrl+F: toggle fullscreen
-        { (modifiers.bitAnd(1048576) != 0) && (char == $f) } { toggleFullscreen.(win) }
+        { (modifiers.bitAnd(1048576) != 0) && (char == $f) } { toggleFullscreen.(~window) }
         // ESC: exit fullscreen
-        { (modifiers == 0) && (keycode == 53) } {  win.endFullScreen }
+        { (modifiers == 0) && (keycode == 53) } {  ~window.endFullScreen }
         // ...all the rest
         { [view, char, modifiers, unicode, keycode].postln }
     });
@@ -289,24 +292,18 @@ var makeGUI = { |window|
 intersections = getGridIntersections.(width, height, gridSize);
 
 // Create the main window
-win = Window("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false)
+~window = Window("Han[ging] Gar[den] Sampler", Rect(0, 0, width, height), resizable: false)
     .background_(Color.black)
     .front;
-gui = makeGUI.(win);
+gui = makeGUI.(~window);
 
 { // Global app clock
     var tick;
-    while {win.isClosed.not} {
+    while {~window.isClosed.not} {
         tick = Main.elapsedTime + (1/60);
         gui.canvas.refresh;
 
         (tick - Main.elapsedTime).max(0.001).wait;
     }
 }.fork(AppClock);
-
-CmdPeriod.doOnce({
-    "Caught signal: <shut down>".warn;
-    win.close;
-    postf("OK\n\n");
-});
 )

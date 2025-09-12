@@ -60,18 +60,17 @@ Server.default = s = Server.local;
         name: name,  // <String> player's name
         samples: samples,  // <Array> of sample filenames
         buffers: nil, // <Array> of loaded buffers
-        synths: nil, // <Array> of active synths
+        synthActive: nil, // <Synth> active synth
         currentIndex: nil, // <Integer> index of currently playing sample
         currentlyPlaying: nil, // <String> filename of currently playing sample
         position: nil, // <Event> position of the player on the canvas
+        stateMonitor: nil, // <Routine> to monitor synth state
 
         init: { arg self;
-            // Initialize buffers and synths arrays
+            // Initialize array of buffers
             self.buffers = Array.fill(self.samples.size, nil);
-            self.synths = Array.fill(self.samples.size, nil);
 
             // Initialization means loading the first sample in `samples`
-            self.currentIndex = 0; // start from the first sample
             self.load;
 
             // Return self for chaining
@@ -93,43 +92,73 @@ Server.default = s = Server.local;
             //
             // Args: variable arguments passed to Synth as parameter pairs
 
-            var samplePath, synthArgs;
+            var synthArgs, bundle;
 
             if (self.samples.isNil.not and: { self.samples.size > 0 }) {
-                if (self.currentIndex.isNil) {
-                    // Start from the first sample
-                    self.currentIndex = 0;
-                } {
-                    // Wrap around
-                    self.currentIndex = self.getNextIndex;
-                };
+                self.currentIndex = self.getNextIndex;
 
                 // Within one player, only one sample can be played at a time
-                if (self.currentlyPlaying.notNil) { self.kill };
+                if (self.currentlyPlaying.notNil) { self.terminate };
+                self.currentlyPlaying = self.samples[self.currentIndex];
 
-                samplePath = self.samples[self.currentIndex];
-                self.currentlyPlaying = samplePath;
-                
                 // Build synth arguments: always include buffer, then add user args
-                synthArgs = [\buf, self.buffers[self.currentIndex]] ++ args;
-                
-                self.synths[self.currentIndex] = Synth(\bufplay, synthArgs);
+                synthArgs = [\buf, self.buffers[self.currentIndex].bufnum] ++ args;
 
-                // Load the next sample in the background
+                // Register synth in NodeWatcher before creating on the server
+                bundle = s.makeBundle(false, {
+                    self.synthActive = Synth(\bufplay, synthArgs);
+                    NodeWatcher.register(self.synthActive, assumePlaying: true)
+                });
+                s.listSendBundle(nil, bundle);
+
+                // Start monitoring synth state
+                self.startMonitoring;
+
+                // Move forward and load the next sample in the background.
                 self.load(self.getNextIndex);
             } {
                 "No samples available to play.".postln;
             };
         },
 
-        kill: { |self|
-            if (self.currentlyPlaying.notNil) {
-                self.synths[self.currentIndex].set(\gate, 0, \lag, 0.5);
-                self.currentlyPlaying = nil;
+        startMonitoring: { |self|
+            if (self.stateMonitor.notNil) {
+                self.stateMonitor.stop
+            };
+
+            if (self.synthActive.notNil) {
+                self.stateMonitor = Routine({
+                    while { self.synthActive.isPlaying } {
+                        0.1.wait;  // Check every 100ms
+                    };
+                    self.synthActive = nil;
+                    self.currentlyPlaying = nil;
+                    self.stateMonitor.stop;
+                }).play;
             };
         },
 
+        terminate: { |self|
+            if (self.synthActive.notNil) {
+                self.synthActive.set(\gate, 0, \lag, 0.5);
+            };
+            
+            // Stop the monitoring routine if it's running
+            if (self.stateMonitor.notNil) {
+                self.stateMonitor.stop;
+                self.stateMonitor = nil;
+            };
+            
+            self.synthActive = nil;
+            self.currentlyPlaying = nil;
+        },
+
         getNextIndex: { |self|
+            if (self.currentIndex.isNil) {
+                // Initialize to the first sample (next statement will make it 0)
+                self.currentIndex = -1;
+            };
+            // Wrap around
             (self.currentIndex + 1) % self.samples.size
         },
 
@@ -259,9 +288,37 @@ s.waitForBoot({
         ["gui.scd", "GUI", false]
     ];
 
+    // // Initialize NodeWatcher
+    // NodeWatcher.newFrom(s);
+
     externals.do({ |elt|
         elt[0] = path +/+ elt[0];
         ~loadExternal.(*elt);
     });
+});
+
+
+// Clean up buffers and MIDI
+~cleanup = {
+    "Cleaning up".inform;
+    ~window.close;
+
+    "> Resetting bus counter...".post;
+    s.newBusAllocators;
+    postf("OK\n");
+
+    "> Clearing buffers...".post;
+    ~players.keysValuesDo({ |key, player|
+        player.terminate;
+        player.buffers.do({ |buf| if (buf.notNil) { buf.free} });
+    });
+    postf("OK\n");
+};
+
+
+CmdPeriod.doOnce({
+    "Caught signal: <shut down>".warn;
+    ~cleanup.();
+    postf("OK\n\n");
 })
 )
