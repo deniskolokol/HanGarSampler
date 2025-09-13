@@ -202,7 +202,8 @@ Server.default = s = Server.local;
             };
         },
 
-        // Setter for position - allows setting position object or individual coordinates
+        // Setter for position - allows setting position object or individual
+        // coordinates.
         setPosition: { |self, x, y, radius|
             if (self.position.isNil) {
                 self.position = ~cPosition.(x, y, radius);
@@ -210,6 +211,43 @@ Server.default = s = Server.local;
                 self.position.set(x, y, radius);
             }
         },
+
+        // Ensures all resources are properly freed and no zombie processes or
+        // memory leaks are left behind.
+        cleanup: { |self|
+            // First stop playback if active
+            if (self.synthActive.notNil) {
+                self.terminate;
+            };
+            
+            // Stop monitoring routine if running
+            if (self.stateMonitor.notNil) {
+                self.stateMonitor.stop;
+                self.stateMonitor = nil;
+            };
+            
+            // Free all buffers
+            if (self.buffers.notNil) {
+                self.buffers.do({ |buf|
+                    if (buf.notNil) {
+                        ("Freeing buffer: " ++ buf).postln;
+                        buf.free;
+                    };
+                });
+                self.buffers = nil;
+            };
+            
+            // Clear all state
+            self.currentIndex = nil;
+            self.currentlyPlaying = nil;
+            self.synthActive = nil;
+            self.position = nil;
+            
+            // Clear samples array
+            self.samples = nil;
+            
+            ("Player '%' cleaned up.".format(self.name)).postln;
+        }
     );
 
     // return player
@@ -288,9 +326,6 @@ s.waitForBoot({
         ["gui.scd", "GUI", false]
     ];
 
-    // // Initialize NodeWatcher
-    // NodeWatcher.newFrom(s);
-
     externals.do({ |elt|
         elt[0] = path +/+ elt[0];
         ~loadExternal.(*elt);
@@ -307,11 +342,8 @@ s.waitForBoot({
     s.newBusAllocators;
     postf("OK\n");
 
-    "> Clearing buffers...".post;
-    ~players.keysValuesDo({ |key, player|
-        player.terminate;
-        player.buffers.do({ |buf| if (buf.notNil) { buf.free} });
-    });
+    "> Cleaning up players...".postln;
+    ~players.do({ |player| player.cleanup });
     postf("OK\n");
 };
 

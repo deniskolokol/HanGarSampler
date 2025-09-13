@@ -38,11 +38,12 @@ var openDirectory = {
 
                 // Log success
                 postf("Successfully loaded audio files from: %\n", ~rootDir);
+
+                // Clean-up existing players, if any
+                ~players.do({ |player| player.cleanup });
+
+                // Create new players and fill them with samples
                 ~samples.keysValuesDo({ |key, value|
-                    "\n%:".format(key).postln;
-                    value.do({ |file|
-                        "\t%".format(file).postln;
-                    });
                     ~players[key] = ~cSamplePlayer.(name: key.asString, samples: value);
                 });
             };

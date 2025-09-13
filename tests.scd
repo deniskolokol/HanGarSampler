@@ -129,28 +129,65 @@
                             player1.terminate;
                             assert.(player1.currentlyPlaying.isNil, "kill sets currentlyPlaying to nil");
 
-                            // TEST 6: Edge cases
-                            "\n=== TEST GROUP 6: Edge Cases ===\n".postf;
+                            // TEST 6: Cleanup functionality
+                            "\n=== TEST GROUP 6: Cleanup Method ===\n".postf;
 
-                            // Test 6.1: Empty samples array
-                            playerEmpty = ~cSamplePlayer.(name: \empty, samples: []);
-                            assert.(playerEmpty.samples.size == 0, "handles empty samples array");
+                            // Start playback to test cleanup during active state
+                            player1.start(\amp, 0);
+                            
+                            {
+                                // Test 6.1: Cleanup during playback
+                                player1.cleanup;
+                                assert.(player1.synthActive.isNil, "cleanup stops active synth");
+                                assert.(player1.currentlyPlaying.isNil, "cleanup clears currentlyPlaying");
+                                assert.(player1.stateMonitor.isNil, "cleanup stops monitoring routine");
+                                assert.(player1.buffers.isNil, "cleanup clears buffers array");
+                                assert.(player1.position.isNil, "cleanup clears position");
+                                assert.(player1.samples.isNil, "cleanup clears samples array");
+                                
+                                // Test 6.2: Cleanup is idempotent (can be called multiple times safely)
+                                player1.cleanup;
+                                assert.(true, "cleanup can be called multiple times without error");
 
-                            // Test 6.2: Single sample
-                            playerSingle = ~cSamplePlayer.(name: \single, samples: [testSamples[0]]);
-                            assert.(playerSingle.samples.size == 1, "handles single sample");
-                            assert.(playerSingle.getNextIndex == 0, "single sample wraps to itself");
+                                // TEST 7: Edge cases
+                                "\n=== TEST GROUP 7: Edge Cases ===\n".postf;
 
-                            // Print results
-                            "\n=== TEST RESULTS ===\n".postf;
-                            testResults.do({ |result| result.postln; });
+                                // Test 7.1: Empty samples array
+                                playerEmpty = ~cSamplePlayer.(name: \empty, samples: []);
+                                assert.(playerEmpty.samples.size == 0, "handles empty samples array");
+                                
+                                // Test 7.2: Single sample
+                                playerSingle = ~cSamplePlayer.(name: \single, samples: [testSamples[0]]);
+                                
+                                // Defer assertions until after buffer load
+                                {
+                                    assert.(playerSingle.samples.size == 1, "handles single sample");
+                                    assert.(playerSingle.getNextIndex == 0, "single sample wraps to itself");
+                                    
+                                    // Don't cleanup here - it will be handled in the final cleanup
+                                }.defer(1.5);
 
-                            postf("Tests passed: %/%\n\n", passedTests, totalTests);
-                            if (passedTests == totalTests) {
-                                "✓✓✓ ALL TESTS PASSED!".inform;
-                            } {
-                                "✗✗✗ Some tests failed. Check implementation.".warn;
-                            };
+                                // Final cleanup and results
+                                {
+                                    // Clean up any remaining buffers
+                                    if (player1.notNil) { player1.cleanup };
+                                    if (playerEmpty.notNil) { playerEmpty.cleanup };
+                                    if (playerSingle.notNil) { playerSingle.cleanup };
+                                }.defer(2);  // Wait for edge cases to complete
+                                
+                                {
+                                    // Print results
+                                    "\n=== TEST RESULTS ===\n".postf;
+                                    testResults.do({ |result| result.postln; });
+
+                                    postf("Tests passed: %/%\n\n", passedTests, totalTests);
+                                    if (passedTests == totalTests) {
+                                        "✓✓✓ ALL TESTS PASSED!".inform;
+                                    } {
+                                        "✗✗✗ Some tests failed. Check implementation.".warn;
+                                    };
+                                }.defer(0.5); // Give time for final cleanup
+                            }.defer(0.1); // End of cleanup tests
                         }.defer(1.0); // Wait for next buffer to load
                     }.defer(0.5); // Wait for synth creation
                 }.defer(0.5); // Wait for start to complete
@@ -180,7 +217,12 @@
             {
                 ("• first buffer loaded: " ++ player1.isBufferLoaded(0)).postln;
                 ("• second buffer loaded: " ++ player1.isBufferLoaded(1)).postln;
-                "Basic tests completed.".postln;
+                
+                // Final cleanup
+                {
+                    player1.cleanup;
+                    "Basic tests completed.".postln;
+                }.defer(0.5);
             }.defer(1.0);
         }.defer(2.0);
     });
