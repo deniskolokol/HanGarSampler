@@ -8,6 +8,7 @@
 var noDirSelected = "No directory selected - Press Ctrl+O to open";
 var transparent = Color.grey(alpha:0.0);
 var gridSize = 200; // Grid spacing
+var circleRadius = 20; // Default circle radius
 var intersections; // Grid centers (coords of the points of attraction)
 var height = Window.screenBounds.height;
 var width = Window.screenBounds.width;
@@ -140,7 +141,6 @@ var makeGUI = { |window|
     // Set up canvas draw function
     canvas.drawFunc = { |view|
         var bounds = ~window.bounds;
-        var circleRadius = 20;
 
         // Update directory label
         directoryLabel.string_(
@@ -221,13 +221,12 @@ var makeGUI = { |window|
     // React to mouse
     canvas.mouseDownAction = { |view, x, y, modifiers, buttonNumber, clickCount|
         var players;
+        // postf("modifiers %, button %, clickCount: %\n", modifiers, buttonNumber, clickCount);
 
-        // First figure out the player(s) under the mouse
+        // Select the players under the mouse
         players = ~players.select({ |player|
             (player.position.notNil and: { player.position.contains(x, y) })
         });
-
-        postf("modifiers %, button %, clickCount: %\n", modifiers, buttonNumber, clickCount);
 
         case
         // no modifiers left button double click
@@ -252,7 +251,26 @@ var makeGUI = { |window|
             nil
         };
     };
-    canvas.mouseMoveAction = canvas.mouseDownAction;
+    canvas.mouseMoveAction = { |view, x, y, modifiers|
+        var players, currPlayer;
+        // postf("modifiers %\n", modifiers);
+
+        // First figure out the player(s) under the mouse
+        players = ~players.select({ |player|
+            (player.position.notNil and: { player.position.contains(x, y) })
+        });
+
+        // In mouseMoveAction use only one player
+        if (players.keys.size > 0) {
+            currPlayer = players.values[0]; // Take the first one
+
+            case
+            // no modifiers left button single click
+            { [0, 256].includes(modifiers) } {
+                currPlayer.setPosition(x, y, circleRadius);
+            };
+        }
+    };
 
     // Animate!
     canvas.animate = true;

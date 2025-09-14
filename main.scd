@@ -14,14 +14,13 @@ Server.default = s = Server.local;
         radius: radius,
 
         init: { |self|
-            // Initialize
-            self.set(x, y, radius);
-            // Return self for chaining
-            self
+            self.define(x, y, radius);
         },
 
         // Method to set all coordinates at once
-        set: { |self, newX, newY, newRadius|
+        // NB: Changed name from 'set' to 'define' to avoid confusion with
+        // built-in 'set' method.
+        define: { |self, newX, newY, newRadius|
             self.x = newX;
             self.y = newY;
             if (newRadius.notNil) { self.radius = newRadius };
@@ -208,8 +207,8 @@ Server.default = s = Server.local;
             if (self.position.isNil) {
                 self.position = ~cPosition.(x, y, radius);
             } {
-                self.position.set(x, y, radius);
-            }
+                self.position.define(x, y, radius);
+            };
         },
 
         // Ensures all resources are properly freed and no zombie processes or
