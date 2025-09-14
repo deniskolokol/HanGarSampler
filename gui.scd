@@ -253,7 +253,6 @@ var makeGUI = { |window|
     };
     canvas.mouseMoveAction = { |view, x, y, modifiers|
         var players, currPlayer;
-        // postf("modifiers %\n", modifiers);
 
         // First figure out the player(s) under the mouse
         players = ~players.select({ |player|
@@ -265,9 +264,21 @@ var makeGUI = { |window|
             currPlayer = players.values[0]; // Take the first one
 
             case
-            // no modifiers left button single click
+            // no modifiers left button single click - move player around freely
             { [0, 256].includes(modifiers) } {
                 currPlayer.setPosition(x, y, circleRadius);
+            }
+
+            // Alt key held - move and snap to grid
+            { modifiers == 524288 } {
+                var nearestGridPoint = currPlayer.position.findNearestGridPoint(gridSize);
+                if (nearestGridPoint.notNil) {
+                    // Snap to grid if close enough
+                    currPlayer.setPosition(nearestGridPoint[0], nearestGridPoint[1], circleRadius);
+                } {
+                    // Otherwise, move freely
+                    currPlayer.setPosition(x, y, circleRadius);
+                }
             };
         }
     };

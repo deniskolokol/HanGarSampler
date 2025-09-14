@@ -37,6 +37,24 @@ Server.default = s = Server.local;
             distance <= self.radius;
         },
 
+        closeTo: { |self, x, y, proximity|
+            var distance = ((x - self.x).squared + (y - self.y).squared).sqrt;
+            distance <= (self.radius + proximity);
+        },
+
+        // Find nearest grid intersection within snap distance
+        findNearestGridPoint: { |self, gridSize, snapDistance = 40|
+            var gridX = (self.x / gridSize).round * gridSize;
+            var gridY = (self.y / gridSize).round * gridSize;
+            var distance = ((gridX - self.x).squared + (gridY - self.y).squared).sqrt;
+            
+            if (distance <= snapDistance) {
+                [gridX, gridY]
+            } {
+                nil
+            }
+        },
+
         // String representation
         asString: { |self|
             "Position(x: %, y: %, radius: %)".format(self.x, self.y, self.radius);
