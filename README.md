@@ -23,7 +23,7 @@ A SuperCollider-based interactive sampler that allows you to arrange and control
 ### Running the Sampler
 
 1. Open `main.scd` in SuperCollider
-2. Execute the entire file (Cmd+Return or Ctrl+Return)
+2. Execute the entire file (`Cmd+Return` or `Ctrl+Return`)
 3. The graphical interface will appear with a grid layout
 
 ### Loading Samples
@@ -36,7 +36,7 @@ A SuperCollider-based interactive sampler that allows you to arrange and control
 ### Controls
 
 - **Drag:** Click and drag circles to move sample players freely
-- **Grid Snapping:** Hold Option (Alt) key while dragging to snap players to grid intersections
+- **Grid Snapping:** Hold `Option` (`Alt`) key while dragging to snap players to grid intersections
 - **Play/Stop:** Double-click a circle to play or stop its sample
 - **Fullscreen:** Press `Cmd+F` (or `Ctrl+F`) to toggle fullscreen mode
 - **Exit Fullscreen:** Press `ESC`
@@ -71,7 +71,7 @@ If you encounter any issues, check the SuperCollider post window for detailed er
 
 ## TODO
 
-Future features and improvements planned for HanGar Sampler:
+Future features and improvements planned for _HanGar Sampler_:
 
 ### Sound Processing
 - Granular synthesis capabilities for sample manipulation
